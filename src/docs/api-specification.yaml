@@ -1,0 +1,951 @@
+openapi: 3.0.0
+info:
+  title: IPSAS Accounting System API
+  description: IPSAS-Compliant Public Sector Accounting System API
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@ipsas-api.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Development server
+  - url: https://api.ipsas-accounting.com/api/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Entity:
+      type: object
+      required:
+        - entityCode
+        - entityName
+        - entityType
+        - fiscalYearEnd
+        - currencyCode
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        entityCode:
+          type: string
+          minLength: 2
+          maxLength: 20
+          pattern: '^[A-Z0-9]+$'
+        entityName:
+          type: string
+          minLength: 3
+          maxLength: 255
+        entityType:
+          type: string
+          enum: [GOVERNMENT, AGENCY, DEPARTMENT, SUBSIDIARY]
+        parentEntityId:
+          type: string
+          format: uuid
+          nullable: true
+        fiscalYearEnd:
+          type: string
+          pattern: '^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$'
+          example: "12-31"
+        currencyCode:
+          type: string
+          minLength: 3
+          maxLength: 3
+          pattern: '^[A-Z]{3}$'
+          example: "USD"
+        isActive:
+          type: boolean
+          default: true
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Fund:
+      type: object
+      required:
+        - fundCode
+        - fundName
+        - fundType
+        - entityId
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fundCode:
+          type: string
+          minLength: 2
+          maxLength: 20
+        fundName:
+          type: string
+          minLength: 3
+          maxLength: 255
+        fundType:
+          type: string
+          enum: [GENERAL, SPECIAL_REVENUE, CAPITAL_PROJECTS, DEBT_SERVICE, ENTERPRISE, INTERNAL_SERVICE]
+        entityId:
+          type: string
+          format: uuid
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        isActive:
+          type: boolean
+          default: true
+        budgetAuthority:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        carryForwardAllowed:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    Account:
+      type: object
+      required:
+        - accountCode
+        - accountName
+        - accountType
+        - fundId
+        - entityId
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        accountCode:
+          type: string
+          minLength: 3
+          maxLength: 20
+          pattern: '^[A-Z0-9-]+$'
+        accountName:
+          type: string
+          minLength: 3
+          maxLength: 255
+        accountType:
+          type: string
+          enum: [ASSET, LIABILITY, NET_POSITION, REVENUE, EXPENSE]
+        parentAccountId:
+          type: string
+          format: uuid
+          nullable: true
+        fundId:
+          type: string
+          format: uuid
+        entityId:
+          type: string
+          format: uuid
+        isActive:
+          type: boolean
+          default: true
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        normalBalance:
+          type: string
+          enum: [DEBIT, CREDIT]
+          default: DEBIT
+        level:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+        isDetailAccount:
+          type: boolean
+          default: true
+        budgetAccount:
+          type: boolean
+          default: false
+        requiresFundAccounting:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    JournalEntry:
+      type: object
+      required:
+        - transactionDate
+        - postingDate
+        - description
+        - fundId
+        - entityId
+        - entries
+      properties:
+        transactionDate:
+          type: string
+          format: date
+        postingDate:
+          type: string
+          format: date
+        description:
+          type: string
+          minLength: 5
+          maxLength: 1000
+        referenceNumber:
+          type: string
+          maxLength: 100
+          nullable: true
+        fundId:
+          type: string
+          format: uuid
+        entityId:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/JournalEntryLine'
+
+    JournalEntryLine:
+      type: object
+      required:
+        - accountId
+      properties:
+        accountId:
+          type: string
+          format: uuid
+        debitAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        creditAmount:
+          type: number
+          format: decimal
+          minimum: 0
+          nullable: true
+        description:
+          type: string
+          maxLength: 500
+          nullable: true
+        costCenter:
+          type: string
+          maxLength: 20
+          nullable: true
+        projectCode:
+          type: string
+          maxLength: 20
+          nullable: true
+        departmentCode:
+          type: string
+          maxLength: 20
+          nullable: true
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        transactionNumber:
+          type: string
+          readOnly: true
+        transactionDate:
+          type: string
+          format: date
+        postingDate:
+          type: string
+          format: date
+        description:
+          type: string
+        referenceNumber:
+          type: string
+          nullable: true
+        sourceModule:
+          type: string
+        fundId:
+          type: string
+          format: uuid
+        entityId:
+          type: string
+          format: uuid
+        fiscalYear:
+          type: integer
+        period:
+          type: integer
+          minimum: 1
+          maximum: 12
+        status:
+          type: string
+          enum: [DRAFT, PENDING, APPROVED, POSTED, REVERSED]
+        totalDebit:
+          type: number
+          format: decimal
+        totalCredit:
+          type: number
+          format: decimal
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/TransactionEntry'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    TransactionEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        accountId:
+          type: string
+          format: uuid
+        debitAmount:
+          type: number
+          format: decimal
+        creditAmount:
+          type: number
+          format: decimal
+        description:
+          type: string
+          nullable: true
+        lineNumber:
+          type: integer
+        costCenter:
+          type: string
+          nullable: true
+        projectCode:
+          type: string
+          nullable: true
+        departmentCode:
+          type: string
+          nullable: true
+
+    Budget:
+      type: object
+      required:
+        - budgetCode
+        - budgetName
+        - fiscalYear
+        - startDate
+        - endDate
+        - entityId
+        - fundId
+        - totalBudgetAmount
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        budgetCode:
+          type: string
+          minLength: 3
+          maxLength: 50
+        budgetName:
+          type: string
+          minLength: 3
+          maxLength: 255
+        fiscalYear:
+          type: integer
+          minimum: 2000
+          maximum: 2100
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        entityId:
+          type: string
+          format: uuid
+        fundId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [DRAFT, SUBMITTED, APPROVED, ACTIVE, CLOSED]
+          default: DRAFT
+        totalBudgetAmount:
+          type: number
+          format: decimal
+          minimum: 0
+        description:
+          type: string
+          maxLength: 1000
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+    ApiResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+        errors:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    PaginationResponse:
+      allOf:
+        - $ref: '#/components/schemas/ApiResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items: {}
+                pagination:
+                  type: object
+                  properties:
+                    currentPage:
+                      type: integer
+                    totalPages:
+                      type: integer
+                    totalItems:
+                      type: integer
+                    itemsPerPage:
+                      type: integer
+                    hasNextPage:
+                      type: boolean
+                    hasPreviousPage:
+                      type: boolean
+
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Check if the API is running
+      tags:
+        - System
+      security: []
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+
+  /entities/{entityId}/funds/{fundId}/accounts:
+    get:
+      summary: Get chart of accounts
+      description: Retrieve paginated list of accounts for a specific entity and fund
+      tags:
+        - Chart of Accounts
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            default: accountCode
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: List of accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts:
+    post:
+      summary: Create new account
+      description: Create a new account in the chart of accounts
+      tags:
+        - Chart of Accounts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+      responses:
+        '200':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /accounts/{id}:
+    get:
+      summary: Get account by ID
+      description: Retrieve a specific account by its ID
+      tags:
+        - Chart of Accounts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Account'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Update account
+      description: Update an existing account
+      tags:
+        - Chart of Accounts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Account'
+      responses:
+        '200':
+          description: Account updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Deactivate account
+      description: Deactivate an account (soft delete)
+      tags:
+        - Chart of Accounts
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account deactivated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /journal-entries:
+    post:
+      summary: Create journal entry
+      description: Create a new journal entry with multiple line items
+      tags:
+        - General Ledger
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JournalEntry'
+      responses:
+        '200':
+          description: Journal entry created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /entities/{entityId}/funds/{fundId}/transactions:
+    get:
+      summary: Get GL transactions
+      description: Retrieve paginated list of general ledger transactions
+      tags:
+        - General Ledger
+      parameters:
+        - name: entityId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: fundId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING, APPROVED, POSTED, REVERSED]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /transactions/{id}/approve:
+    put:
+      summary: Approve transaction
+      description: Approve a draft transaction
+      tags:
+        - General Ledger
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction approved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /transactions/{id}/post:
+    put:
+      summary: Post transaction
+      description: Post an approved transaction to the general ledger
+      tags:
+        - General Ledger
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transaction posted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /transactions/{id}/reverse:
+    put:
+      summary: Reverse transaction
+      description: Reverse a posted transaction
+      tags:
+        - General Ledger
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 5
+                  maxLength: 1000
+                reversalDate:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Transaction reversed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+tags:
+  - name: System
+    description: System health and status endpoints
+  - name: Chart of Accounts
+    description: Chart of accounts management
+  - name: General Ledger
+    description: General ledger transactions and journal entries
+  - name: Budget
+    description: Budget management and tracking
+  - name: Revenue
+    description: Revenue recognition and tracking
